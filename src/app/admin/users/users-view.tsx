@@ -8,6 +8,7 @@ import type { AdminUsersClientResponse } from "@/types/admin-users";
 import { isAdminUsersSuccess } from "@/types/admin-users";
 import type { SafeAdminUser } from "@/types/admin-user";
 
+import { DeactivateUserDialog } from "./deactivate-user-dialog";
 import { EditUserDialog } from "./edit-user-dialog";
 import { UserRowActions } from "./user-row-actions";
 
@@ -20,6 +21,10 @@ function isAdminRole(role: string | null | undefined): boolean {
 function formatName(user: SafeAdminUser): string {
   const full = [user.firstName, user.lastName].filter(Boolean).join(" ").trim();
   return full || user.email;
+}
+
+function isInactiveStatus(status: string): boolean {
+  return status.trim().toLowerCase() === "inactive";
 }
 
 function formatDate(value: string): string {
@@ -45,7 +50,11 @@ export function AdminUsersView() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
   const [editingUser, setEditingUser] = useState<SafeAdminUser | null>(null);
+  const [deactivatingUser, setDeactivatingUser] = useState<SafeAdminUser | null>(
+    null,
+  );
   const [updatedEmail, setUpdatedEmail] = useState<string | null>(null);
+  const [deactivatedEmail, setDeactivatedEmail] = useState<string | null>(null);
 
   const isAdmin = isAdminRole(portalUser?.role);
 
@@ -182,7 +191,7 @@ export function AdminUsersView() {
     );
   }
 
-  function handleUserUpdated(user: SafeAdminUser) {
+  function mergeUserIntoList(user: SafeAdminUser) {
     setUsers((prev) => {
       const next = prev.map((u) => (u.id === user.id ? user : u));
       return [...next].sort(
@@ -190,8 +199,28 @@ export function AdminUsersView() {
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
       );
     });
+  }
+
+  function handleUserUpdated(user: SafeAdminUser) {
+    mergeUserIntoList(user);
     setEditingUser(null);
     setUpdatedEmail(user.email);
+    setDeactivatedEmail(null);
+  }
+
+  function handleUserDeactivated(user: SafeAdminUser) {
+    mergeUserIntoList(user);
+    setDeactivatingUser(null);
+    setDeactivatedEmail(user.email);
+    setUpdatedEmail(null);
+    if (editingUser?.id === user.id) {
+      setEditingUser(null);
+    }
+  }
+
+  function openEdit(user: SafeAdminUser) {
+    if (isInactiveStatus(user.status)) return;
+    setEditingUser(user);
   }
 
   return (
@@ -199,6 +228,11 @@ export function AdminUsersView() {
       {updatedEmail ? (
         <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-100">
           User updated successfully: {updatedEmail}
+        </div>
+      ) : null}
+      {deactivatedEmail ? (
+        <div className="mb-4 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-100">
+          Account deactivated: {deactivatedEmail}
         </div>
       ) : null}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -273,11 +307,24 @@ export function AdminUsersView() {
                   <td className="px-3 py-3">{formatName(u)}</td>
                   <td className="px-3 py-3">{u.email}</td>
                   <td className="px-3 py-3">{u.role}</td>
-                  <td className="px-3 py-3">{u.status}</td>
+                  <td className="px-3 py-3">
+                    {isInactiveStatus(u.status) ? (
+                      <span className="inline-flex rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                        inactive
+                      </span>
+                    ) : (
+                      u.status
+                    )}
+                  </td>
                   <td className="px-3 py-3">{u.lastLoginAtUk ?? "Never"}</td>
                   <td className="px-3 py-3">{formatDate(u.createdAt)}</td>
                   <td className="px-3 py-3">
-                    <UserRowActions user={u} onEdit={setEditingUser} />
+                    <UserRowActions
+                      user={u}
+                      isInactive={isInactiveStatus(u.status)}
+                      onEdit={openEdit}
+                      onDeactivate={setDeactivatingUser}
+                    />
                   </td>
                 </tr>
               ))}
@@ -285,11 +332,19 @@ export function AdminUsersView() {
           </table>
         </div>
       )}
-      {editingUser ? (
+      {editingUser && !isInactiveStatus(editingUser.status) ? (
         <EditUserDialog
           user={editingUser}
           onClose={() => setEditingUser(null)}
           onSuccess={handleUserUpdated}
+        />
+      ) : null}
+      {deactivatingUser ? (
+        <DeactivateUserDialog
+          user={deactivatingUser}
+          displayName={formatName(deactivatingUser)}
+          onClose={() => setDeactivatingUser(null)}
+          onSuccess={handleUserDeactivated}
         />
       ) : null}
     </section>

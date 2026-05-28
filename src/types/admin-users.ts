@@ -75,8 +75,29 @@ export function isAdminUsersSuccess(
   return response.ok && response.httpStatus === 200;
 }
 
+export type DeactivateAdminUserClientResponse =
+  | {
+      ok: true;
+      httpStatus: 200;
+      code: "ok";
+      user: SafeAdminUser;
+    }
+  | {
+      ok: false;
+      httpStatus: number;
+      code: AdminUsersCode | "not_found";
+      message?: string;
+      detail?: string;
+    };
+
 export function isEditAdminUserSuccess(
   response: EditAdminUserClientResponse,
 ): response is Extract<EditAdminUserClientResponse, { ok: true }> {
+  return response.ok && response.httpStatus === 200;
+}
+
+export function isDeactivateAdminUserSuccess(
+  response: DeactivateAdminUserClientResponse,
+): response is Extract<DeactivateAdminUserClientResponse, { ok: true }> {
   return response.ok && response.httpStatus === 200;
 }

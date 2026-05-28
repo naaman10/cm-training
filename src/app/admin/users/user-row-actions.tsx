@@ -6,10 +6,17 @@ import type { SafeAdminUser } from "@/types/admin-user";
 
 type UserRowActionsProps = {
   user: SafeAdminUser;
+  isInactive: boolean;
   onEdit: (user: SafeAdminUser) => void;
+  onDeactivate: (user: SafeAdminUser) => void;
 };
 
-export function UserRowActions({ user, onEdit }: UserRowActionsProps) {
+export function UserRowActions({
+  user,
+  isInactive,
+  onEdit,
+  onDeactivate,
+}: UserRowActionsProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -48,18 +55,35 @@ export function UserRowActions({ user, onEdit }: UserRowActionsProps) {
       {open ? (
         <div
           role="menu"
-          className="absolute right-0 top-full z-10 mt-1 min-w-[10rem] rounded-lg border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+          className="absolute right-0 top-full z-10 mt-1 min-w-[11rem] rounded-lg border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
         >
           <button
             type="button"
             role="menuitem"
-            className="block w-full px-3 py-2 text-left text-sm text-zinc-800 hover:bg-zinc-50 dark:text-zinc-100 dark:hover:bg-zinc-800"
+            disabled={isInactive}
+            title={isInactive ? "Inactive users cannot be edited" : undefined}
+            className="block w-full px-3 py-2 text-left text-sm text-zinc-800 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-100 dark:hover:bg-zinc-800"
             onClick={() => {
+              if (isInactive) return;
               setOpen(false);
               onEdit(user);
             }}
           >
             Edit user
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            disabled={isInactive}
+            title={isInactive ? "User is already inactive" : undefined}
+            className="block w-full px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950/40"
+            onClick={() => {
+              if (isInactive) return;
+              setOpen(false);
+              onDeactivate(user);
+            }}
+          >
+            Deactivate account
           </button>
         </div>
       ) : null}
