@@ -47,8 +47,36 @@ export type CreateAdminUserClientResponse =
       detail?: string;
     };
 
+export type EditAdminUserInput = {
+  email?: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  role?: string;
+};
+
+export type EditAdminUserClientResponse =
+  | {
+      ok: true;
+      httpStatus: 200;
+      code: "ok";
+      user: SafeAdminUser;
+    }
+  | {
+      ok: false;
+      httpStatus: number;
+      code: AdminUsersCode | "not_found";
+      message?: string;
+      detail?: string;
+    };
+
 export function isAdminUsersSuccess(
   response: AdminUsersClientResponse,
 ): response is Extract<AdminUsersClientResponse, { ok: true }> {
+  return response.ok && response.httpStatus === 200;
+}
+
+export function isEditAdminUserSuccess(
+  response: EditAdminUserClientResponse,
+): response is Extract<EditAdminUserClientResponse, { ok: true }> {
   return response.ok && response.httpStatus === 200;
 }

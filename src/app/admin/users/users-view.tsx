@@ -8,6 +8,9 @@ import type { AdminUsersClientResponse } from "@/types/admin-users";
 import { isAdminUsersSuccess } from "@/types/admin-users";
 import type { SafeAdminUser } from "@/types/admin-user";
 
+import { EditUserDialog } from "./edit-user-dialog";
+import { UserRowActions } from "./user-row-actions";
+
 function isAdminRole(role: string | null | undefined): boolean {
   if (!role) return false;
   const normalized = role.trim().toLowerCase();
@@ -41,6 +44,8 @@ export function AdminUsersView() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
+  const [editingUser, setEditingUser] = useState<SafeAdminUser | null>(null);
+  const [updatedEmail, setUpdatedEmail] = useState<string | null>(null);
 
   const isAdmin = isAdminRole(portalUser?.role);
 
@@ -177,8 +182,25 @@ export function AdminUsersView() {
     );
   }
 
+  function handleUserUpdated(user: SafeAdminUser) {
+    setUsers((prev) => {
+      const next = prev.map((u) => (u.id === user.id ? user : u));
+      return [...next].sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+    });
+    setEditingUser(null);
+    setUpdatedEmail(user.email);
+  }
+
   return (
     <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+      {updatedEmail ? (
+        <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-100">
+          User updated successfully: {updatedEmail}
+        </div>
+      ) : null}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
           {users.length} user{users.length === 1 ? "" : "s"}
@@ -240,6 +262,9 @@ export function AdminUsersView() {
                 <th className="px-3 py-3">Status</th>
                 <th className="px-3 py-3">Last login</th>
                 <th className="px-3 py-3">Created date</th>
+                <th className="px-3 py-3 text-right">
+                  <span className="sr-only">Actions</span>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
@@ -251,12 +276,22 @@ export function AdminUsersView() {
                   <td className="px-3 py-3">{u.status}</td>
                   <td className="px-3 py-3">{u.lastLoginAtUk ?? "Never"}</td>
                   <td className="px-3 py-3">{formatDate(u.createdAt)}</td>
+                  <td className="px-3 py-3">
+                    <UserRowActions user={u} onEdit={setEditingUser} />
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+      {editingUser ? (
+        <EditUserDialog
+          user={editingUser}
+          onClose={() => setEditingUser(null)}
+          onSuccess={handleUserUpdated}
+        />
+      ) : null}
     </section>
   );
 }

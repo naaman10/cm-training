@@ -3,6 +3,8 @@ import type {
   AdminUsersClientResponse,
   CreateAdminUserClientResponse,
   CreateAdminUserInput,
+  EditAdminUserClientResponse,
+  EditAdminUserInput,
 } from "@/types/admin-users";
 import type { SafeAdminUser } from "@/types/admin-user";
 
@@ -12,6 +14,18 @@ function codeForStatus(
   if (status === 400) return "bad_request";
   if (status === 401) return "unauthenticated";
   if (status === 403) return "forbidden";
+  if (status === 404) return "unknown";
+  if (status === 409) return "conflict";
+  return "unknown";
+}
+
+function editCodeForStatus(
+  status: number,
+): Exclude<EditAdminUserClientResponse["code"], "ok"> {
+  if (status === 400) return "bad_request";
+  if (status === 401) return "unauthenticated";
+  if (status === 403) return "forbidden";
+  if (status === 404) return "not_found";
   if (status === 409) return "conflict";
   return "unknown";
 }
@@ -186,6 +200,98 @@ export async function buildCreateAdminUserPayload(
                 : status >= 500
                   ? "Admin create-user service encountered an error. Please retry."
                   : "Could not create user."),
+      detail,
+    },
+  };
+}
+
+export async function buildEditAdminUserPayload(
+  accessToken: string,
+  userId: string,
+  input: EditAdminUserInput,
+): Promise<{ response: EditAdminUserClientResponse; httpStatus: number }> {
+  let upstream: Response;
+  try {
+    upstream = await fetchCmTrainingApiWithBearer(
+      accessToken,
+      `/api/admin/users/${encodeURIComponent(userId)}`,
+      {
+        method: "PATCH",
+        cache: "no-store",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(input),
+      },
+    );
+  } catch {
+    return {
+      httpStatus: 503,
+      response: {
+        ok: false,
+        httpStatus: 503,
+        code: "network_error",
+        message: "Could not reach admin users API.",
+      },
+    };
+  }
+
+  const status = upstream.status;
+  const text = await upstream.text();
+  let json: unknown = null;
+  if (text) {
+    try {
+      json = JSON.parse(text) as unknown;
+    } catch {
+      json = { raw: text };
+    }
+  }
+
+  if (status === 200 && json && typeof json === "object" && "user" in json) {
+    const user = (json as { user: unknown }).user;
+    if (user && typeof user === "object") {
+      return {
+        httpStatus: 200,
+        response: {
+          ok: true,
+          httpStatus: 200,
+          code: "ok",
+          user: user as SafeAdminUser,
+        },
+      };
+    }
+  }
+
+  const message = readMessage(json);
+  const detail =
+    readDetail(json) ||
+    (json &&
+    typeof json === "object" &&
+    "raw" in json &&
+    typeof (json as { raw?: unknown }).raw === "string"
+      ? (json as { raw: string }).raw
+      : undefined);
+  return {
+    httpStatus: status,
+    response: {
+      ok: false,
+      httpStatus: status,
+      code: editCodeForStatus(status),
+      message:
+        message ??
+        (status === 400
+          ? "Please check email and role values."
+          : status === 401
+            ? "Session expired or token is invalid. Please sign in again."
+            : status === 403
+              ? "You are not authorized to edit users."
+              : status === 404
+                ? "User not found."
+                : status === 409
+                  ? "A user with this email already exists."
+                  : status >= 500
+                    ? "Admin update-user service encountered an error. Please retry."
+                    : "Could not update user."),
       detail,
     },
   };
