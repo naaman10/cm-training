@@ -29,6 +29,12 @@ export function MainNav({ actionHref, actionLabel }: MainNavProps) {
       
           </Link>
           <div className="hidden items-center gap-5 text-sm font-medium text-zinc-600 md:flex dark:text-zinc-300">
+            <Link
+              className="transition hover:text-zinc-900 dark:hover:text-zinc-100"
+              href="/courses"
+            >
+              Courses
+            </Link>
             {isAdmin ? (
               <Link
                 className="transition hover:text-zinc-900 dark:hover:text-zinc-100"
