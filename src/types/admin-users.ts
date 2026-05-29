@@ -101,3 +101,24 @@ export function isDeactivateAdminUserSuccess(
 ): response is Extract<DeactivateAdminUserClientResponse, { ok: true }> {
   return response.ok && response.httpStatus === 200;
 }
+
+export type PasswordResetAdminUserClientResponse =
+  | {
+      ok: true;
+      httpStatus: 202;
+      code: "ok";
+      message: string;
+    }
+  | {
+      ok: false;
+      httpStatus: number;
+      code: AdminUsersCode | "not_found";
+      message?: string;
+      detail?: string;
+    };
+
+export function isPasswordResetAdminUserSuccess(
+  response: PasswordResetAdminUserClientResponse,
+): response is Extract<PasswordResetAdminUserClientResponse, { ok: true }> {
+  return response.ok && response.httpStatus === 202;
+}

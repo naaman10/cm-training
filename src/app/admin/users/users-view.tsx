@@ -8,23 +8,20 @@ import type { AdminUsersClientResponse } from "@/types/admin-users";
 import { isAdminUsersSuccess } from "@/types/admin-users";
 import type { SafeAdminUser } from "@/types/admin-user";
 
+import {
+  formatAdminUserName,
+  isInactiveStatus,
+  isSamePortalUser,
+} from "./admin-user-utils";
 import { DeactivateUserDialog } from "./deactivate-user-dialog";
 import { EditUserDialog } from "./edit-user-dialog";
+import { ResetPasswordDialog } from "./reset-password-dialog";
 import { UserRowActions } from "./user-row-actions";
 
 function isAdminRole(role: string | null | undefined): boolean {
   if (!role) return false;
   const normalized = role.trim().toLowerCase();
   return normalized === "admin" || normalized.includes("admin");
-}
-
-function formatName(user: SafeAdminUser): string {
-  const full = [user.firstName, user.lastName].filter(Boolean).join(" ").trim();
-  return full || user.email;
-}
-
-function isInactiveStatus(status: string): boolean {
-  return status.trim().toLowerCase() === "inactive";
 }
 
 function formatDate(value: string): string {
@@ -55,6 +52,11 @@ export function AdminUsersView() {
   );
   const [updatedEmail, setUpdatedEmail] = useState<string | null>(null);
   const [deactivatedEmail, setDeactivatedEmail] = useState<string | null>(null);
+  const [passwordResetEmail, setPasswordResetEmail] = useState<string | null>(
+    null,
+  );
+  const [resetPasswordUser, setResetPasswordUser] =
+    useState<SafeAdminUser | null>(null);
 
   const isAdmin = isAdminRole(portalUser?.role);
 
@@ -118,7 +120,7 @@ export function AdminUsersView() {
   const filteredUsers = useMemo(() => {
     const query = search.trim().toLowerCase();
     return users.filter((u) => {
-      const name = formatName(u).toLowerCase();
+      const name = formatAdminUserName(u).toLowerCase();
       const email = u.email.toLowerCase();
       const matchesSearch = !query || name.includes(query) || email.includes(query);
       const matchesStatus = statusFilter === "all" || u.status === statusFilter;
@@ -206,6 +208,7 @@ export function AdminUsersView() {
     setEditingUser(null);
     setUpdatedEmail(user.email);
     setDeactivatedEmail(null);
+    setPasswordResetEmail(null);
   }
 
   function handleUserDeactivated(user: SafeAdminUser) {
@@ -213,6 +216,7 @@ export function AdminUsersView() {
     setDeactivatingUser(null);
     setDeactivatedEmail(user.email);
     setUpdatedEmail(null);
+    setPasswordResetEmail(null);
     if (editingUser?.id === user.id) {
       setEditingUser(null);
     }
@@ -221,6 +225,25 @@ export function AdminUsersView() {
   function openEdit(user: SafeAdminUser) {
     if (isInactiveStatus(user.status)) return;
     setEditingUser(user);
+  }
+
+  function openDeactivate(user: SafeAdminUser) {
+    if (isInactiveStatus(user.status)) return;
+    if (isSamePortalUser(portalUser, user)) return;
+    setDeactivatingUser(user);
+  }
+
+  function openResetPassword(user: SafeAdminUser) {
+    if (isInactiveStatus(user.status)) return;
+    if (!user.email.trim()) return;
+    setResetPasswordUser(user);
+  }
+
+  function handlePasswordResetSent(email: string) {
+    setResetPasswordUser(null);
+    setPasswordResetEmail(email);
+    setUpdatedEmail(null);
+    setDeactivatedEmail(null);
   }
 
   return (
@@ -233,6 +256,12 @@ export function AdminUsersView() {
       {deactivatedEmail ? (
         <div className="mb-4 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-100">
           Account deactivated: {deactivatedEmail}
+        </div>
+      ) : null}
+      {passwordResetEmail ? (
+        <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-100">
+          Password reset email sent to {passwordResetEmail}. Ask the user to
+          check their inbox (and spam).
         </div>
       ) : null}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -304,7 +333,7 @@ export function AdminUsersView() {
             <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
               {filteredUsers.map((u) => (
                 <tr key={u.id} className="text-zinc-800 dark:text-zinc-100">
-                  <td className="px-3 py-3">{formatName(u)}</td>
+                  <td className="px-3 py-3">{formatAdminUserName(u)}</td>
                   <td className="px-3 py-3">{u.email}</td>
                   <td className="px-3 py-3">{u.role}</td>
                   <td className="px-3 py-3">
@@ -322,8 +351,10 @@ export function AdminUsersView() {
                     <UserRowActions
                       user={u}
                       isInactive={isInactiveStatus(u.status)}
+                      isCurrentUser={isSamePortalUser(portalUser, u)}
                       onEdit={openEdit}
-                      onDeactivate={setDeactivatingUser}
+                      onResetPassword={openResetPassword}
+                      onDeactivate={openDeactivate}
                     />
                   </td>
                 </tr>
@@ -339,12 +370,20 @@ export function AdminUsersView() {
           onSuccess={handleUserUpdated}
         />
       ) : null}
-      {deactivatingUser ? (
+      {deactivatingUser &&
+      !isSamePortalUser(portalUser, deactivatingUser) ? (
         <DeactivateUserDialog
           user={deactivatingUser}
-          displayName={formatName(deactivatingUser)}
+          displayName={formatAdminUserName(deactivatingUser)}
           onClose={() => setDeactivatingUser(null)}
           onSuccess={handleUserDeactivated}
+        />
+      ) : null}
+      {resetPasswordUser ? (
+        <ResetPasswordDialog
+          user={resetPasswordUser}
+          onClose={() => setResetPasswordUser(null)}
+          onSuccess={handlePasswordResetSent}
         />
       ) : null}
     </section>

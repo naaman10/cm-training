@@ -6,6 +6,7 @@ import type {
   DeactivateAdminUserClientResponse,
   EditAdminUserClientResponse,
   EditAdminUserInput,
+  PasswordResetAdminUserClientResponse,
 } from "@/types/admin-users";
 import type { SafeAdminUser } from "@/types/admin-user";
 
@@ -376,6 +377,90 @@ export async function buildDeactivateAdminUserPayload(
               : status >= 500
                 ? "Admin deactivate-user service encountered an error. Please retry."
                 : "Could not deactivate user."),
+      detail,
+    },
+  };
+}
+
+export async function buildPasswordResetAdminUserPayload(
+  accessToken: string,
+  userId: string,
+): Promise<{ response: PasswordResetAdminUserClientResponse; httpStatus: number }> {
+  let upstream: Response;
+  try {
+    upstream = await fetchCmTrainingApiWithBearer(
+      accessToken,
+      `/api/admin/users/${encodeURIComponent(userId)}/password-reset`,
+      {
+        method: "POST",
+        cache: "no-store",
+      },
+    );
+  } catch {
+    return {
+      httpStatus: 503,
+      response: {
+        ok: false,
+        httpStatus: 503,
+        code: "network_error",
+        message: "Could not reach admin users API.",
+      },
+    };
+  }
+
+  const status = upstream.status;
+  const text = await upstream.text();
+  let json: unknown = null;
+  if (text) {
+    try {
+      json = JSON.parse(text) as unknown;
+    } catch {
+      json = { raw: text };
+    }
+  }
+
+  if (status === 202 && json && typeof json === "object" && "ok" in json) {
+    const ok = (json as { ok: unknown }).ok;
+    const message = readMessage(json);
+    if (ok === true) {
+      return {
+        httpStatus: 202,
+        response: {
+          ok: true,
+          httpStatus: 202,
+          code: "ok",
+          message: message ?? "Password reset requested",
+        },
+      };
+    }
+  }
+
+  const message = readMessage(json);
+  const detail =
+    readDetail(json) ||
+    (json &&
+    typeof json === "object" &&
+    "raw" in json &&
+    typeof (json as { raw?: unknown }).raw === "string"
+      ? (json as { raw: string }).raw
+      : undefined);
+  return {
+    httpStatus: status,
+    response: {
+      ok: false,
+      httpStatus: status,
+      code: editCodeForStatus(status),
+      message:
+        message ??
+        (status === 401
+          ? "Session expired or token is invalid. Please sign in again."
+          : status === 403
+            ? "You are not authorized to request password resets."
+            : status === 404
+              ? "User not found."
+              : status >= 500
+                ? "Password reset service encountered an error. Please retry."
+                : "Could not request password reset."),
       detail,
     },
   };
