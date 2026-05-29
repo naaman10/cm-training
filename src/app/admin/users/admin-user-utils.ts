@@ -1,6 +1,12 @@
 import type { SafeAdminUser } from "@/types/admin-user";
 import type { PortalUser } from "@/types/portal-user";
 
+export const ADMIN_ROLE_OPTIONS = [
+  { value: "admin", label: "Admin" },
+  { value: "instructor", label: "Instructor" },
+  { value: "learner", label: "Learner" },
+] as const;
+
 export function formatAdminUserName(user: SafeAdminUser): string {
   const full = [user.firstName, user.lastName].filter(Boolean).join(" ").trim();
   return full || user.email;

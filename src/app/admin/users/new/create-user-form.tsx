@@ -9,6 +9,8 @@ import type {
   CreateAdminUserInput,
 } from "@/types/admin-users";
 
+import { ADMIN_ROLE_OPTIONS } from "../admin-user-utils";
+
 const DEFAULT_ROLE = "instructor";
 
 function isValidEmail(email: string): boolean {
@@ -112,8 +114,11 @@ export function CreateUserForm() {
               required
               className="rounded-lg border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950"
             >
-              <option value="instructor">instructor</option>
-              <option value="admin">admin</option>
+              {ADMIN_ROLE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
             </select>
           </label>
 

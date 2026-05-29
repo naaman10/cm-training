@@ -10,11 +10,7 @@ import type {
 } from "@/types/admin-users";
 import { isEditAdminUserSuccess } from "@/types/admin-users";
 
-const ROLE_OPTIONS = [
-  { value: "admin", label: "Admin" },
-  { value: "instructor", label: "Instructor" },
-  { value: "learner", label: "Learner" },
-] as const;
+import { ADMIN_ROLE_OPTIONS } from "./admin-user-utils";
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -256,7 +252,7 @@ export function EditUserDialog({ user, onClose, onSuccess }: EditUserDialogProps
                 required
                 className="rounded-lg border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950"
               >
-                {ROLE_OPTIONS.map((opt) => (
+                {ADMIN_ROLE_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}
                   </option>
