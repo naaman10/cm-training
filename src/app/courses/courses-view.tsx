@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { normalizeCourseThumbnail } from "@/lib/courses/normalize-thumbnail";
+import { splitCoursesByEnrollment } from "@/lib/courses/course-utils";
 import type { SafeCourseSummary } from "@/types/course";
 import type { CoursesListClientResponse } from "@/types/courses";
 import { isCoursesListSuccess } from "@/types/courses";
 
-import { CourseCard } from "./course-card";
+import { CoursesSection } from "./courses-section";
 
 export function CoursesView() {
   const [loading, setLoading] = useState(true);
@@ -39,18 +39,7 @@ export function CoursesView() {
     }
 
     if (isCoursesListSuccess(payload)) {
-      const withThumbnails = payload.courses.map((course) => ({
-        ...course,
-        thumbnail: normalizeCourseThumbnail(course.thumbnail),
-      }));
-      const sorted = [...withThumbnails].sort((a, b) =>
-        (a.courseName ?? a.internalName ?? "").localeCompare(
-          b.courseName ?? b.internalName ?? "",
-          undefined,
-          { sensitivity: "base" },
-        ),
-      );
-      setCourses(sorted);
+      setCourses(payload.courses);
       setLoading(false);
       return;
     }
@@ -69,6 +58,11 @@ export function CoursesView() {
       void loadCourses();
     });
   }, []);
+
+  const { yourCourses, availableCourses } = useMemo(
+    () => splitCoursesByEnrollment(courses),
+    [courses],
+  );
 
   if (loading) {
     return (
@@ -144,12 +138,21 @@ export function CoursesView() {
   }
 
   return (
-    <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-      {courses.map((course) => (
-        <li key={course.id}>
-          <CourseCard course={course} />
-        </li>
-      ))}
-    </ul>
+    <div className="space-y-10">
+      {yourCourses.length > 0 ? (
+        <CoursesSection
+          title="Your courses"
+          description="Courses you are enrolled in."
+          courses={yourCourses}
+          emptyMessage=""
+        />
+      ) : null}
+      <CoursesSection
+        title="Available courses"
+        description="Courses you can enroll in."
+        courses={availableCourses}
+        emptyMessage="You are enrolled in all available courses."
+      />
+    </div>
   );
 }

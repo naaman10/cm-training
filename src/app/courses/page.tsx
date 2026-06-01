@@ -15,7 +15,7 @@ export default function CoursesPage() {
             Courses
           </h1>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            Training courses available for your role.
+            Your enrolled courses and others available for your role.
           </p>
         </div>
         <CoursesView />
