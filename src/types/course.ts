@@ -11,6 +11,7 @@ export type CourseThumbnail = {
 
 export type SafeCourseSummary = {
   id: string;
+  courseSlug: string | null;
   internalName: string | null;
   courseName: string | null;
   courseDescription: unknown;
@@ -31,12 +32,14 @@ export type CoursePrerequisite = {
   courseName: string | null;
 };
 
+import type { LessonProgress } from "@/types/lesson";
+
 export type SafeCourseLesson = {
   id: string;
   order: number;
   lessonName: string | null;
   lessonDescription: unknown;
-};
+} & LessonProgress;
 
 export type SafeCourseDetail = SafeCourseSummary & {
   prerequisites: CoursePrerequisite[];

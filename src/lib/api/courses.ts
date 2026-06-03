@@ -1,4 +1,6 @@
 import { fetchCmTrainingApiWithBearer } from "@/lib/api/client";
+import { normalizeLessonProgress } from "@/lib/api/lessons";
+import { courseSlugMatches } from "@/lib/courses/course-slug";
 import { normalizeCourseThumbnail } from "@/lib/courses/normalize-thumbnail";
 import type {
   EnrollmentStatus,
@@ -57,6 +59,7 @@ function normalizeCourseLessons(raw: unknown): SafeCourseLesson[] {
     if (!item || typeof item !== "object") return;
     const lesson = item as SafeCourseLesson;
     if (typeof lesson.id !== "string" || !lesson.id.trim()) return;
+    const progress = normalizeLessonProgress(lesson);
     lessons.push({
       id: lesson.id,
       order:
@@ -65,6 +68,7 @@ function normalizeCourseLessons(raw: unknown): SafeCourseLesson[] {
           : index + 1,
       lessonName: normalizeNullableString(lesson.lessonName),
       lessonDescription: lesson.lessonDescription ?? null,
+      ...progress,
     });
   });
   return lessons.sort((a, b) => a.order - b.order);
@@ -76,6 +80,9 @@ function normalizeCourseSummary(raw: unknown): SafeCourseSummary | null {
   if (typeof course.id !== "string" || !course.id.trim()) return null;
   return {
     id: course.id,
+    courseSlug: normalizeNullableString(
+      (course as { courseSlug?: unknown }).courseSlug,
+    ),
     internalName: normalizeNullableString(course.internalName),
     courseName: normalizeNullableString(course.courseName),
     courseDescription: course.courseDescription ?? null,
@@ -192,40 +199,10 @@ export async function buildCoursesListPayload(
   };
 }
 
-export async function buildCourseDetailPayload(
-  accessToken: string,
-  courseId: string,
-): Promise<{ response: CourseDetailClientResponse; httpStatus: number }> {
-  let upstream: Response;
-  try {
-    upstream = await fetchCmTrainingApiWithBearer(
-      accessToken,
-      `/api/courses/${encodeURIComponent(courseId)}`,
-      { cache: "no-store" },
-    );
-  } catch {
-    return {
-      httpStatus: 503,
-      response: {
-        ok: false,
-        httpStatus: 503,
-        code: "network_error",
-        message: "Could not reach courses API.",
-      },
-    };
-  }
-
-  const status = upstream.status;
-  const text = await upstream.text();
-  let json: unknown = null;
-  if (text) {
-    try {
-      json = JSON.parse(text) as unknown;
-    } catch {
-      json = { raw: text };
-    }
-  }
-
+function parseCourseDetailUpstreamResponse(
+  status: number,
+  json: unknown,
+): { response: CourseDetailClientResponse; httpStatus: number } {
   if (status === 200 && json && typeof json === "object" && "course" in json) {
     const rawCourse = (json as { course: unknown }).course;
     const normalized = normalizeCourseDetail(rawCourse);
@@ -266,6 +243,84 @@ export async function buildCourseDetailPayload(
       detail,
     },
   };
+}
+
+async function fetchCourseDetailUpstream(
+  accessToken: string,
+  upstreamPath: string,
+): Promise<{ response: CourseDetailClientResponse; httpStatus: number }> {
+  let upstream: Response;
+  try {
+    upstream = await fetchCmTrainingApiWithBearer(accessToken, upstreamPath, {
+      cache: "no-store",
+    });
+  } catch {
+    return {
+      httpStatus: 503,
+      response: {
+        ok: false,
+        httpStatus: 503,
+        code: "network_error",
+        message: "Could not reach courses API.",
+      },
+    };
+  }
+
+  const status = upstream.status;
+  const text = await upstream.text();
+  let json: unknown = null;
+  if (text) {
+    try {
+      json = JSON.parse(text) as unknown;
+    } catch {
+      json = { raw: text };
+    }
+  }
+
+  return parseCourseDetailUpstreamResponse(status, json);
+}
+
+export async function buildCourseDetailPayload(
+  accessToken: string,
+  courseId: string,
+): Promise<{ response: CourseDetailClientResponse; httpStatus: number }> {
+  return fetchCourseDetailUpstream(
+    accessToken,
+    `/api/courses/${encodeURIComponent(courseId)}`,
+  );
+}
+
+export async function buildCourseDetailBySlugPayload(
+  accessToken: string,
+  courseSlug: string,
+): Promise<{ response: CourseDetailClientResponse; httpStatus: number }> {
+  const trimmedSlug = courseSlug.trim();
+  const bySlug = await fetchCourseDetailUpstream(
+    accessToken,
+    `/api/courses/by-slug/${encodeURIComponent(trimmedSlug)}`,
+  );
+
+  if (bySlug.response.ok) {
+    return bySlug;
+  }
+
+  if (bySlug.httpStatus !== 404) {
+    return bySlug;
+  }
+
+  const list = await buildCoursesListPayload(accessToken);
+  if (!list.response.ok || !("courses" in list.response)) {
+    return bySlug;
+  }
+
+  const match = list.response.courses.find((course) =>
+    courseSlugMatches(course.courseSlug, trimmedSlug),
+  );
+  if (!match) {
+    return bySlug;
+  }
+
+  return buildCourseDetailPayload(accessToken, match.id);
 }
 
 function normalizeEnrollment(raw: unknown): SafeEnrollment | null {

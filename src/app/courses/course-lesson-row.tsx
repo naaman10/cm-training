@@ -1,8 +1,12 @@
+import Link from "next/link";
+
+import { lessonProgressPercent, lessonStatusLabel } from "@/lib/courses/lesson-utils";
 import type { SafeCourseLesson } from "@/types/course";
 
 type CourseLessonRowProps = {
   lesson: SafeCourseLesson;
   locked: boolean;
+  href?: string | null;
   previewImageUrl?: string | null;
 };
 
@@ -15,10 +19,14 @@ function formatLessonLabel(lesson: SafeCourseLesson): string {
 export function CourseLessonRow({
   lesson,
   locked,
+  href,
   previewImageUrl,
 }: CourseLessonRowProps) {
-  return (
-    <li className="flex items-center gap-3 border-b border-zinc-100 py-4 last:border-b-0 dark:border-zinc-800 lg:gap-4 lg:py-5">
+  const progress = lessonProgressPercent(lesson.lessonStatus);
+  const interactive = !locked && href;
+
+  const content = (
+    <>
       <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-violet-200 via-fuchsia-100 to-amber-100 dark:from-violet-950 dark:via-fuchsia-950 dark:to-amber-950 lg:h-20 lg:w-20">
         {previewImageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- lesson preview fallback
@@ -57,6 +65,12 @@ export function CourseLessonRow({
       <div className="min-w-0 flex-1">
         <p className="text-xs text-zinc-400 dark:text-zinc-500">
           Lesson {lesson.order}
+          {!locked ? (
+            <span className="text-zinc-500 dark:text-zinc-400">
+              {" "}
+              · {lessonStatusLabel(lesson.lessonStatus)}
+            </span>
+          ) : null}
         </p>
         <p
           className={`truncate font-semibold ${
@@ -69,7 +83,10 @@ export function CourseLessonRow({
         </p>
         {!locked ? (
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-violet-100 dark:bg-violet-950/60">
-            <div className="h-full w-0 rounded-full bg-violet-500" />
+            <div
+              className="h-full rounded-full bg-violet-500 transition-all"
+              style={{ width: `${progress}%` }}
+            />
           </div>
         ) : null}
       </div>
@@ -85,6 +102,25 @@ export function CourseLessonRow({
           </svg>
         </span>
       ) : null}
+    </>
+  );
+
+  if (interactive) {
+    return (
+      <li>
+        <Link
+          href={href}
+          className="flex items-center gap-3 border-b border-zinc-100 py-4 transition hover:bg-zinc-50 last:border-b-0 dark:border-zinc-800 dark:hover:bg-zinc-800/50 lg:gap-4 lg:py-5"
+        >
+          {content}
+        </Link>
+      </li>
+    );
+  }
+
+  return (
+    <li className="flex items-center gap-3 border-b border-zinc-100 py-4 last:border-b-0 dark:border-zinc-800 lg:gap-4 lg:py-5">
+      {content}
     </li>
   );
 }

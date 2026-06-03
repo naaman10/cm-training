@@ -4,17 +4,29 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import {
+  courseDetailPath,
+  courseSlugMatches,
+  looksLikeContentfulEntryId,
+} from "@/lib/courses/course-slug";
 import { courseDisplayTitle } from "@/lib/courses/course-utils";
+import {
+  continueLearningHref,
+  isLessonAccessible,
+} from "@/lib/courses/lesson-utils";
+import { lessonDetailPath } from "@/lib/courses/lesson-path";
 import { richTextToPlainText } from "@/lib/courses/rich-text";
 import type { SafeCourseDetail, SafeCourseLesson } from "@/types/course";
 import type {
   CompleteCourseClientResponse,
   CourseDetailClientResponse,
+  CoursesListClientResponse,
   EnrollCourseClientResponse,
 } from "@/types/courses";
 import {
   isCompleteCourseSuccess,
   isCourseDetailSuccess,
+  isCoursesListSuccess,
   isEnrollCourseSuccess,
 } from "@/types/courses";
 
@@ -23,7 +35,7 @@ import { CourseHero } from "../course-hero";
 import { CourseLessonRow } from "../course-lesson-row";
 
 type CourseDetailViewProps = {
-  courseId: string;
+  courseRef: string;
 };
 
 function buildLessons(course: SafeCourseDetail): SafeCourseLesson[] {
@@ -34,17 +46,12 @@ function buildLessons(course: SafeCourseDetail): SafeCourseLesson[] {
     order: index + 1,
     lessonName: index === 0 ? "Introduction" : `Lesson ${index + 1}`,
     lessonDescription: null,
+    lessonStatus: "not_started" as const,
+    startedAt: null,
+    startedAtUk: null,
+    completedAt: null,
+    completedAtUk: null,
   }));
-}
-
-function isLessonLocked(
-  enrollmentStatus: SafeCourseDetail["enrollmentStatus"],
-  lessonIndex: number,
-): boolean {
-  if (enrollmentStatus === "enrolled" || enrollmentStatus === "completed") {
-    return false;
-  }
-  return lessonIndex > 0;
 }
 
 function CourseMeta({
@@ -86,7 +93,7 @@ function EnrollmentBanners({ course }: { course: SafeCourseDetail }) {
   );
 }
 
-export function CourseDetailView({ courseId }: CourseDetailViewProps) {
+export function CourseDetailView({ courseRef }: CourseDetailViewProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState(false);
@@ -103,10 +110,16 @@ export function CourseDetailView({ courseId }: CourseDetailViewProps) {
     setDetail(null);
     setHttpStatus(null);
 
+    const ref = courseRef.trim();
+    const byId = looksLikeContentfulEntryId(ref);
+    const detailUrl = byId
+      ? `/api/courses/${encodeURIComponent(ref)}`
+      : `/api/courses/by-slug/${encodeURIComponent(ref)}`;
+
     let res: Response;
     let payload: CourseDetailClientResponse;
     try {
-      res = await fetch(`/api/courses/${encodeURIComponent(courseId)}`, {
+      res = await fetch(detailUrl, {
         credentials: "include",
         cache: "no-store",
       });
@@ -120,13 +133,53 @@ export function CourseDetailView({ courseId }: CourseDetailViewProps) {
     }
 
     if (isCourseDetailSuccess(payload)) {
-      setCourse(payload.course);
+      const loaded = payload.course;
+      setCourse(loaded);
       setLoading(false);
+
+      if (byId && loaded.courseSlug?.trim()) {
+        router.replace(courseDetailPath(loaded));
+      }
       return;
     }
 
-    const status =
+    let status =
       typeof payload.httpStatus === "number" ? payload.httpStatus : res.status;
+
+    if (!byId && status === 404) {
+      try {
+        const listRes = await fetch("/api/courses", {
+          credentials: "include",
+          cache: "no-store",
+        });
+        const listPayload = (await listRes.json()) as CoursesListClientResponse;
+        if (isCoursesListSuccess(listPayload)) {
+          const match = listPayload.courses.find((item) =>
+            courseSlugMatches(item.courseSlug, ref),
+          );
+          if (match) {
+            const idRes = await fetch(
+              `/api/courses/${encodeURIComponent(match.id)}`,
+              { credentials: "include", cache: "no-store" },
+            );
+            const idPayload = (await idRes.json()) as CourseDetailClientResponse;
+            if (isCourseDetailSuccess(idPayload)) {
+              setCourse(idPayload.course);
+              setLoading(false);
+              return;
+            }
+            payload = idPayload;
+            status =
+              typeof idPayload.httpStatus === "number"
+                ? idPayload.httpStatus
+                : idRes.status;
+          }
+        }
+      } catch {
+        // Keep original slug lookup error below.
+      }
+    }
+
     setHttpStatus(status);
     setError(payload.message ?? "Could not load course.");
     setDetail(typeof payload.detail === "string" ? payload.detail : null);
@@ -144,7 +197,7 @@ export function CourseDetailView({ courseId }: CourseDetailViewProps) {
     let payload: EnrollCourseClientResponse;
     try {
       res = await fetch(
-        `/api/courses/${encodeURIComponent(courseId)}/enroll`,
+        `/api/courses/${encodeURIComponent(course.id)}/enroll`,
         { method: "POST", credentials: "include" },
       );
       payload = (await res.json()) as EnrollCourseClientResponse;
@@ -188,7 +241,7 @@ export function CourseDetailView({ courseId }: CourseDetailViewProps) {
     let payload: CompleteCourseClientResponse;
     try {
       res = await fetch(
-        `/api/courses/${encodeURIComponent(courseId)}/complete`,
+        `/api/courses/${encodeURIComponent(course.id)}/complete`,
         { method: "POST", credentials: "include" },
       );
       payload = (await res.json()) as CompleteCourseClientResponse;
@@ -213,7 +266,7 @@ export function CourseDetailView({ courseId }: CourseDetailViewProps) {
     queueMicrotask(() => {
       void loadCourse();
     });
-  }, [courseId]);
+  }, [courseRef]);
 
   if (loading) {
     return (
@@ -267,6 +320,7 @@ export function CourseDetailView({ courseId }: CourseDetailViewProps) {
     enrolling,
     completing,
     actionError,
+    continueHref: continueLearningHref(course),
     onEnroll: () => void enrollInCourse(),
     onComplete: () => void markComplete(),
   };
@@ -278,11 +332,16 @@ export function CourseDetailView({ courseId }: CourseDetailViewProps) {
       </div>
     ) : (
       <ul>
-        {lessons.map((lesson, index) => (
+        {lessons.map((lesson) => (
           <CourseLessonRow
             key={lesson.id}
             lesson={lesson}
-            locked={isLessonLocked(course.enrollmentStatus, index)}
+            locked={!isLessonAccessible(course.enrollmentStatus)}
+            href={
+              isLessonAccessible(course.enrollmentStatus)
+                ? lessonDetailPath(course, lesson.id)
+                : null
+            }
             previewImageUrl={previewImageUrl}
           />
         ))}
@@ -347,7 +406,7 @@ export function CourseDetailView({ courseId }: CourseDetailViewProps) {
           </div>
 
           <h2 className="mb-4 hidden text-lg font-semibold text-zinc-900 dark:text-zinc-50 lg:block">
-            Curriculum
+            Lessons
           </h2>
 
           {lessonList}

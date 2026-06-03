@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { courseDetailPath } from "@/lib/courses/course-slug";
 import { courseDisplayTitle } from "@/lib/courses/course-utils";
 import type { SafeCourseSummary } from "@/types/course";
 
@@ -11,7 +12,7 @@ type CourseCardProps = {
 
 export function CourseCard({ course }: CourseCardProps) {
   const title = courseDisplayTitle(course);
-  const detailHref = `/courses/${encodeURIComponent(course.id)}`;
+  const detailHref = courseDetailPath(course);
   const { enrollmentStatus } = course;
 
   return (

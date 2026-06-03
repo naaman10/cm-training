@@ -1,8 +1,11 @@
+import Link from "next/link";
+
 type CourseDetailActionsProps = {
   enrollmentStatus: "available" | "enrolled" | "completed";
   enrolling: boolean;
   completing: boolean;
   actionError: string | null;
+  continueHref?: string | null;
   onEnroll: () => void;
   onComplete: () => void;
 };
@@ -12,6 +15,7 @@ export function CourseDetailActions({
   enrolling,
   completing,
   actionError,
+  continueHref,
   onEnroll,
   onComplete,
 }: CourseDetailActionsProps) {
@@ -34,12 +38,18 @@ export function CourseDetailActions({
 
       {enrollmentStatus === "enrolled" ? (
         <>
-          <button
-            type="button"
-            className="inline-flex h-12 w-full items-center justify-center rounded-2xl bg-violet-600 text-sm font-semibold text-white hover:bg-violet-500"
-          >
-            Continue learning
-          </button>
+          {continueHref ? (
+            <Link
+              href={continueHref}
+              className="inline-flex h-12 w-full items-center justify-center rounded-2xl bg-violet-600 text-sm font-semibold text-white hover:bg-violet-500"
+            >
+              Continue learning
+            </Link>
+          ) : (
+            <div className="inline-flex h-12 w-full items-center justify-center rounded-2xl bg-zinc-100 text-sm font-semibold text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+              No lessons yet
+            </div>
+          )}
           <button
             type="button"
             onClick={onComplete}
