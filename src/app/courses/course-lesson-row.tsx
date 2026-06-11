@@ -22,7 +22,7 @@ export function CourseLessonRow({
   href,
   previewImageUrl,
 }: CourseLessonRowProps) {
-  const progress = lessonProgressPercent(lesson.lessonStatus);
+  const progress = lessonProgressPercent(lesson);
   const interactive = !locked && href;
 
   const content = (

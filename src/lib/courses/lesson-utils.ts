@@ -1,14 +1,19 @@
 import { lessonDetailPath } from "@/lib/courses/lesson-path";
-import type { EnrollmentStatus, SafeCourseDetail } from "@/types/course";
+import type { EnrollmentStatus, SafeCourseDetail, SafeCourseLesson } from "@/types/course";
 import type { LessonStatus } from "@/types/lesson";
 
 export function isLessonAccessible(enrollmentStatus: EnrollmentStatus): boolean {
   return enrollmentStatus === "enrolled" || enrollmentStatus === "completed";
 }
 
-export function lessonProgressPercent(lessonStatus: LessonStatus): number {
-  if (lessonStatus === "completed") return 100;
-  if (lessonStatus === "started") return 45;
+export function lessonProgressPercent(
+  lesson: Pick<SafeCourseLesson, "lessonStatus" | "questionCount" | "answeredCount">,
+): number {
+  if (lesson.lessonStatus === "completed") return 100;
+  if (lesson.questionCount > 0) {
+    return Math.round((lesson.answeredCount / lesson.questionCount) * 100);
+  }
+  if (lesson.lessonStatus === "started") return 10;
   return 0;
 }
 
@@ -18,15 +23,36 @@ export function lessonStatusLabel(lessonStatus: LessonStatus): string {
   return "Not started";
 }
 
+function lessonHasIncompleteQuestions(lesson: SafeCourseLesson): boolean {
+  return (
+    lesson.questionCount > 0 && lesson.answeredCount < lesson.questionCount
+  );
+}
+
 export function continueLearningHref(course: SafeCourseDetail): string | null {
   if (!isLessonAccessible(course.enrollmentStatus) || course.lessons.length === 0) {
     return null;
   }
 
-  const target =
-    course.lessons.find((lesson) => lesson.lessonStatus === "started") ??
-    course.lessons.find((lesson) => lesson.lessonStatus === "not_started") ??
-    course.lessons[0];
+  const inProgress = course.lessons.find(
+    (lesson) =>
+      lesson.lessonStatus === "started" && lessonHasIncompleteQuestions(lesson),
+  );
+  if (inProgress) {
+    return lessonDetailPath(course, inProgress.id);
+  }
 
-  return target ? lessonDetailPath(course, target.id) : null;
+  const started = course.lessons.find((lesson) => lesson.lessonStatus === "started");
+  if (started) {
+    return lessonDetailPath(course, started.id);
+  }
+
+  const notStarted = course.lessons.find(
+    (lesson) => lesson.lessonStatus === "not_started",
+  );
+  if (notStarted) {
+    return lessonDetailPath(course, notStarted.id);
+  }
+
+  return lessonDetailPath(course, course.lessons[0].id);
 }

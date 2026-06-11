@@ -14,6 +14,7 @@ import {
   continueLearningHref,
   isLessonAccessible,
 } from "@/lib/courses/lesson-utils";
+import { emptyLessonProgressFields } from "@/lib/courses/lesson-progress";
 import { lessonDetailPath } from "@/lib/courses/lesson-path";
 import { richTextToPlainText } from "@/lib/courses/rich-text";
 import type { SafeCourseDetail, SafeCourseLesson } from "@/types/course";
@@ -51,6 +52,7 @@ function buildLessons(course: SafeCourseDetail): SafeCourseLesson[] {
     startedAtUk: null,
     completedAt: null,
     completedAtUk: null,
+    ...emptyLessonProgressFields(),
   }));
 }
 

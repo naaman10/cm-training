@@ -2,12 +2,24 @@ import type { CourseThumbnail } from "@/types/course";
 
 export type LessonStatus = "not_started" | "started" | "completed";
 
+export type LessonQuestionAnswer = {
+  questionId: string;
+  answerId: string;
+  answeredAt: string | null;
+  answeredAtUk: string | null;
+};
+
 export type LessonProgress = {
   lessonStatus: LessonStatus;
   startedAt: string | null;
   startedAtUk: string | null;
   completedAt: string | null;
   completedAtUk: string | null;
+  questionCount: number;
+  answeredCount: number;
+  nextQuestionIndex: number;
+  answeredQuestionIds: string[];
+  answers: LessonQuestionAnswer[];
 };
 
 export type SafeAnswer = {

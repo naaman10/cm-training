@@ -1,20 +1,25 @@
 import { fetchCmTrainingApiWithBearer } from "@/lib/api/client";
+import { emptyLessonProgressFields } from "@/lib/courses/lesson-progress";
 import { normalizeCourseThumbnail } from "@/lib/courses/normalize-thumbnail";
 import type {
   LessonProgress,
+  LessonQuestionAnswer,
   LessonStatus,
   SafeAnswer,
+  LessonSession,
   SafeLessonDetail,
   SafeQuestion,
 } from "@/types/lesson";
 import type {
   LessonClientResponse,
+  SaveLessonAnswerClientResponse,
   StartLessonClientResponse,
 } from "@/types/lessons";
 
 type LessonApiCode = Exclude<LessonClientResponse["code"], "ok">;
 
 function codeForStatus(status: number): LessonApiCode {
+  if (status === 400) return "bad_request";
   if (status === 401) return "unauthenticated";
   if (status === 403) return "forbidden";
   if (status === 404) return "not_found";
@@ -48,23 +53,62 @@ function normalizeNullableString(raw: unknown): string | null {
   return typeof raw === "string" && raw.trim() ? raw : null;
 }
 
-function normalizeLessonProgress(raw: unknown): LessonProgress {
+function normalizeLessonQuestionAnswer(raw: unknown): LessonQuestionAnswer | null {
+  if (!raw || typeof raw !== "object") return null;
+  const row = raw as LessonQuestionAnswer;
+  if (typeof row.questionId !== "string" || !row.questionId.trim()) return null;
+  if (typeof row.answerId !== "string" || !row.answerId.trim()) return null;
+  return {
+    questionId: row.questionId,
+    answerId: row.answerId,
+    answeredAt: normalizeNullableString(row.answeredAt),
+    answeredAtUk: normalizeNullableString(row.answeredAtUk),
+  };
+}
+
+export function normalizeLessonProgress(raw: unknown): LessonProgress {
+  const defaults = {
+    lessonStatus: "not_started" as const,
+    startedAt: null,
+    startedAtUk: null,
+    completedAt: null,
+    completedAtUk: null,
+    ...emptyLessonProgressFields(),
+  };
+
   if (!raw || typeof raw !== "object") {
-    return {
-      lessonStatus: "not_started",
-      startedAt: null,
-      startedAtUk: null,
-      completedAt: null,
-      completedAtUk: null,
-    };
+    return defaults;
   }
+
   const progress = raw as LessonProgress;
+  const answers = Array.isArray(progress.answers)
+    ? progress.answers
+        .map((item) => normalizeLessonQuestionAnswer(item))
+        .filter((item): item is LessonQuestionAnswer => item != null)
+    : [];
+
   return {
     lessonStatus: normalizeLessonStatus(progress.lessonStatus),
     startedAt: normalizeNullableString(progress.startedAt),
     startedAtUk: normalizeNullableString(progress.startedAtUk),
     completedAt: normalizeNullableString(progress.completedAt),
     completedAtUk: normalizeNullableString(progress.completedAtUk),
+    questionCount:
+      typeof progress.questionCount === "number" && progress.questionCount > 0
+        ? progress.questionCount
+        : 0,
+    answeredCount:
+      typeof progress.answeredCount === "number" ? progress.answeredCount : 0,
+    nextQuestionIndex:
+      typeof progress.nextQuestionIndex === "number"
+        ? progress.nextQuestionIndex
+        : 0,
+    answeredQuestionIds: Array.isArray(progress.answeredQuestionIds)
+      ? progress.answeredQuestionIds.filter(
+          (id): id is string => typeof id === "string" && id.trim().length > 0,
+        )
+      : [],
+    answers,
   };
 }
 
@@ -123,19 +167,30 @@ function parseLessonSessionResponse(
   json: unknown,
 ): { response: LessonClientResponse; httpStatus: number } {
   if (
-    status === 200 &&
+    (status === 200 || status === 201) &&
     json &&
     typeof json === "object" &&
     "lesson" in json &&
     "progress" in json
   ) {
     const lesson = normalizeLessonDetail((json as { lesson: unknown }).lesson);
-    const progress = normalizeLessonProgress(
+    let progress = normalizeLessonProgress(
       (json as { progress: unknown }).progress,
     );
     if (lesson) {
+      const questionTotal = lesson.questions.length;
+      if (questionTotal > 0 && progress.questionCount !== questionTotal) {
+        progress = {
+          ...progress,
+          questionCount: questionTotal,
+          nextQuestionIndex:
+            progress.nextQuestionIndex >= questionTotal
+              ? questionTotal
+              : progress.nextQuestionIndex,
+        };
+      }
       return {
-        httpStatus: 200,
+        httpStatus: status,
         response: {
           ok: true,
           httpStatus: 200,
@@ -159,13 +214,15 @@ function parseLessonSessionResponse(
         message ??
         (status === 404
           ? "Lesson not found."
-          : status === 401
-            ? "Session expired or token is invalid. Please sign in again."
-            : status === 403
-              ? "Your account is suspended or blocked."
-              : status >= 500
-                ? "Lesson service encountered an error. Please retry."
-                : "Could not load lesson."),
+          : status === 400
+            ? "Invalid question or answer."
+            : status === 401
+              ? "Session expired or token is invalid. Please sign in again."
+              : status === 403
+                ? "Your account is suspended or blocked."
+                : status >= 500
+                  ? "Lesson service encountered an error. Please retry."
+                  : "Could not load lesson."),
       detail,
     },
   };
@@ -181,6 +238,11 @@ async function fetchLessonUpstream(
     upstream = await fetchCmTrainingApiWithBearer(accessToken, path, {
       cache: "no-store",
       ...init,
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        ...init?.headers,
+      },
     });
   } catch {
     return {
@@ -206,6 +268,10 @@ async function fetchLessonUpstream(
   }
 
   return parseLessonSessionResponse(status, json);
+}
+
+function toSession(response: Extract<LessonClientResponse, { ok: true }>): LessonSession {
+  return { lesson: response.lesson, progress: response.progress };
 }
 
 export async function buildGetLessonPayload(
@@ -241,4 +307,31 @@ export async function buildStartLessonPayload(
   return result as { response: StartLessonClientResponse; httpStatus: number };
 }
 
-export { normalizeLessonProgress };
+export async function buildSaveLessonAnswerPayload(
+  accessToken: string,
+  courseId: string,
+  lessonId: string,
+  questionId: string,
+  answerId: string,
+): Promise<{ response: SaveLessonAnswerClientResponse; httpStatus: number }> {
+  const result = await fetchLessonUpstream(
+    accessToken,
+    `/api/courses/${encodeURIComponent(courseId)}/lessons/${encodeURIComponent(lessonId)}/answers`,
+    {
+      method: "POST",
+      body: JSON.stringify({ questionId, answerId }),
+    },
+  );
+  if (result.response.ok && (result.httpStatus === 200 || result.httpStatus === 201)) {
+    return {
+      httpStatus: result.httpStatus,
+      response: {
+        ...result.response,
+        httpStatus: result.httpStatus as 200 | 201,
+      },
+    };
+  }
+  return result as { response: SaveLessonAnswerClientResponse; httpStatus: number };
+}
+
+export { toSession };
