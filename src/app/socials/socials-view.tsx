@@ -143,7 +143,7 @@ export function SocialsView() {
             onChange={(event) =>
               setTemplateId(event.target.value as SocialTemplateId)
             }
-            className="rounded-xl border border-zinc-300 bg-white px-3 py-2.5 dark:border-zinc-700 dark:bg-zinc-950"
+            className="rounded-lg border border-zinc-300 bg-white px-3 py-2.5 dark:border-zinc-700 dark:bg-zinc-950"
           >
             {SOCIAL_TEMPLATES.map((template) => (
               <option key={template.id} value={template.id}>
@@ -153,7 +153,8 @@ export function SocialsView() {
           </select>
         </label>
 
-        <div>
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="text-zinc-700 dark:text-zinc-300">Media</span>
           <input
             ref={fileInputRef}
             type="file"
@@ -168,38 +169,52 @@ export function SocialsView() {
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="flex h-24 w-full items-center justify-center rounded-2xl bg-zinc-200 text-sm font-medium text-zinc-700 transition hover:bg-zinc-300 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+            className="flex min-h-[2.75rem] w-full items-center justify-between gap-3 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-left dark:border-zinc-700 dark:bg-zinc-950"
           >
-            {uploadStatus === "uploading" ? "Uploading…" : "Media Upload"}
+            <span
+              className={`truncate ${
+                fileName
+                  ? "text-zinc-900 dark:text-zinc-100"
+                  : "text-zinc-500 dark:text-zinc-400"
+              }`}
+            >
+              {uploadStatus === "uploading"
+                ? "Uploading…"
+                : fileName ?? "Choose image or video"}
+            </span>
+            <span className="shrink-0 rounded-md border border-zinc-200 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:border-zinc-600 dark:text-zinc-300">
+              Browse
+            </span>
           </button>
           {fileName ? (
-            <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-              {fileName}
-              {uploadStatus === "uploaded" ? " · saved to Cloudinary" : null}
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">
+              {uploadStatus === "uploaded" ? "Saved to Cloudinary" : null}
               {uploadStatus === "local"
-                ? " · local preview only (configure Cloudinary to store uploads)"
+                ? "Local preview only. Add Cloudinary env vars to store uploads."
                 : null}
-            </p>
+            </span>
           ) : (
-            <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">
               {cloudinaryReady
                 ? "Images and video upload to Cloudinary."
-                : "Choose a file to preview. Add Cloudinary env vars to store uploads."}
-            </p>
+                : "Files preview locally until Cloudinary is configured."}
+            </span>
           )}
           {uploadError ? (
-            <p className="mt-1 text-xs text-red-600 dark:text-red-400">{uploadError}</p>
+            <span className="text-xs text-red-600 dark:text-red-400">
+              {uploadError}
+            </span>
           ) : null}
-        </div>
+        </label>
 
         <label className="flex flex-col gap-1 text-sm">
-          <span className="sr-only">Post text</span>
+          <span className="text-zinc-700 dark:text-zinc-300">Text</span>
           <textarea
             value={text}
             onChange={(event) => setText(event.target.value)}
             rows={8}
-            placeholder="Text area"
-            className="w-full resize-y rounded-2xl border-0 bg-zinc-200 px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-500 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-400"
+            placeholder="Write your caption…"
+            className="w-full resize-y rounded-lg border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950"
           />
         </label>
 
