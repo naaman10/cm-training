@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { usePortalSession } from "@/context/portal-session";
+import { roleIncludesAdmin } from "@/lib/features/can";
 import type { SafeAdminUser } from "@/types/admin-user";
 import type {
   EditAdminUserClientResponse,
@@ -11,6 +12,7 @@ import type {
 import { isEditAdminUserSuccess } from "@/types/admin-users";
 
 import { ADMIN_ROLE_OPTIONS } from "./admin-user-utils";
+import { UserPermissionToggles } from "./user-permission-toggles";
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -23,12 +25,6 @@ function roleForSelect(apiRole: string): string {
   if (lower.includes("learner")) return "learner";
   const first = apiRole.split(",")[0]?.trim().toLowerCase();
   return first || "instructor";
-}
-
-function isAdminRole(role: string | null | undefined): boolean {
-  if (!role) return false;
-  const normalized = role.trim().toLowerCase();
-  return normalized === "admin" || normalized.includes("admin");
 }
 
 function buildPatchPayload(
@@ -71,7 +67,7 @@ type EditUserDialogProps = {
 };
 
 export function EditUserDialog({ user, onClose, onSuccess }: EditUserDialogProps) {
-  const { user: portalUser } = usePortalSession();
+  const { user: portalUser, refetch } = usePortalSession();
 
   const [email, setEmail] = useState(user.email);
   const [firstName, setFirstName] = useState(user.firstName ?? "");
@@ -108,7 +104,7 @@ export function EditUserDialog({ user, onClose, onSuccess }: EditUserDialogProps
     portalUser?.id === user.id || portalUser?.email === user.email;
   const removingOwnAdmin =
     editingSelf &&
-    isAdminRole(user.role) &&
+    roleIncludesAdmin(user.role) &&
     role.trim().toLowerCase() !== "admin" &&
     !role.trim().toLowerCase().includes("admin");
 
@@ -178,7 +174,7 @@ export function EditUserDialog({ user, onClose, onSuccess }: EditUserDialogProps
         role="dialog"
         aria-modal="true"
         aria-labelledby="edit-user-title"
-        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl dark:border-zinc-700 dark:bg-zinc-900"
+        className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl dark:border-zinc-700 dark:bg-zinc-900"
       >
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
@@ -189,7 +185,8 @@ export function EditUserDialog({ user, onClose, onSuccess }: EditUserDialogProps
               Edit user
             </h2>
             <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-              Update profile and role. Status is not editable here.
+              Update profile and role. Feature permissions apply immediately.
+              Status is not editable here.
             </p>
           </div>
           <button
@@ -322,6 +319,16 @@ export function EditUserDialog({ user, onClose, onSuccess }: EditUserDialogProps
             </button>
           </div>
         </form>
+
+        <div className="mt-6">
+          <UserPermissionToggles
+            key={user.id}
+            userId={user.id}
+            onSelfGrantChange={
+              editingSelf ? () => refetch({ force: true }) : undefined
+            }
+          />
+        </div>
       </div>
     </div>
   );

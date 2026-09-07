@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePortalSession } from "@/context/portal-session";
+import { FEATURE_NAMES } from "@/lib/features/names";
 
 type MainNavProps = {
   actionHref: string;
@@ -9,8 +10,9 @@ type MainNavProps = {
 };
 
 export function MainNav({ actionHref, actionLabel }: MainNavProps) {
-  const { user } = usePortalSession();
-  const isAdmin = user?.role?.toLowerCase().includes("admin");
+  const { can } = usePortalSession();
+  const showCourses = can(FEATURE_NAMES.courses);
+  const showUserManagement = can(FEATURE_NAMES.userManagement);
 
   return (
     <nav className="mx-auto mt-6 w-full max-w-5xl px-4 sm:px-6">
@@ -29,13 +31,15 @@ export function MainNav({ actionHref, actionLabel }: MainNavProps) {
       
           </Link>
           <div className="hidden items-center gap-5 text-sm font-medium text-zinc-600 md:flex dark:text-zinc-300">
-            <Link
-              className="transition hover:text-zinc-900 dark:hover:text-zinc-100"
-              href="/courses"
-            >
-              Courses
-            </Link>
-            {isAdmin ? (
+            {showCourses ? (
+              <Link
+                className="transition hover:text-zinc-900 dark:hover:text-zinc-100"
+                href="/courses"
+              >
+                Courses
+              </Link>
+            ) : null}
+            {showUserManagement ? (
               <Link
                 className="transition hover:text-zinc-900 dark:hover:text-zinc-100"
                 href="/admin/users"

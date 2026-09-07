@@ -6,6 +6,8 @@ type CourseDetailActionsProps = {
   completing: boolean;
   actionError: string | null;
   continueHref?: string | null;
+  canEnroll: boolean;
+  canAccessLessons: boolean;
   onEnroll: () => void;
   onComplete: () => void;
 };
@@ -16,6 +18,8 @@ export function CourseDetailActions({
   completing,
   actionError,
   continueHref,
+  canEnroll,
+  canAccessLessons,
   onEnroll,
   onComplete,
 }: CourseDetailActionsProps) {
@@ -25,7 +29,7 @@ export function CourseDetailActions({
         <p className="text-sm text-red-600 dark:text-red-400">{actionError}</p>
       ) : null}
 
-      {enrollmentStatus === "available" ? (
+      {enrollmentStatus === "available" && canEnroll ? (
         <button
           type="button"
           onClick={onEnroll}
@@ -38,18 +42,20 @@ export function CourseDetailActions({
 
       {enrollmentStatus === "enrolled" ? (
         <>
-          {continueHref ? (
-            <Link
-              href={continueHref}
-              className="inline-flex h-12 w-full items-center justify-center rounded-2xl bg-violet-600 text-sm font-semibold text-white hover:bg-violet-500"
-            >
-              Continue learning
-            </Link>
-          ) : (
-            <div className="inline-flex h-12 w-full items-center justify-center rounded-2xl bg-zinc-100 text-sm font-semibold text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
-              No lessons yet
-            </div>
-          )}
+          {canAccessLessons ? (
+            continueHref ? (
+              <Link
+                href={continueHref}
+                className="inline-flex h-12 w-full items-center justify-center rounded-2xl bg-violet-600 text-sm font-semibold text-white hover:bg-violet-500"
+              >
+                Continue learning
+              </Link>
+            ) : (
+              <div className="inline-flex h-12 w-full items-center justify-center rounded-2xl bg-zinc-100 text-sm font-semibold text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+                No lessons yet
+              </div>
+            )
+          ) : null}
           <button
             type="button"
             onClick={onComplete}

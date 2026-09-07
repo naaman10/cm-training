@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
+import { FeatureUnauthorized } from "@/components/feature-unauthorized";
+import { usePortalSession } from "@/context/portal-session";
 import { LessonHub } from "@/app/courses/lesson-hub";
 import { LessonQuestionPage } from "@/app/courses/lesson-question-page";
 import {
@@ -19,6 +21,7 @@ import {
   lessonQuestionPath,
   parseLessonQuestionIndex,
 } from "@/lib/courses/lesson-path";
+import { FEATURE_NAMES } from "@/lib/features/names";
 import type { SafeCourseDetail } from "@/types/course";
 import type { LessonSession } from "@/types/lesson";
 import type {
@@ -84,6 +87,8 @@ export function LessonView({ courseSlug, lessonId }: LessonViewProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const questionIndex = parseLessonQuestionIndex(searchParams.get("q"));
+  const { can } = usePortalSession();
+  const canAccessLessons = can(FEATURE_NAMES.lessons);
 
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
@@ -136,6 +141,7 @@ export function LessonView({ courseSlug, lessonId }: LessonViewProps) {
   );
 
   useEffect(() => {
+    if (!canAccessLessons) return;
     let cancelled = false;
 
     async function load() {
@@ -191,7 +197,7 @@ export function LessonView({ courseSlug, lessonId }: LessonViewProps) {
     return () => {
       cancelled = true;
     };
-  }, [courseSlug, lessonId, questionIndex, loadLessonContent]);
+  }, [courseSlug, lessonId, questionIndex, loadLessonContent, canAccessLessons]);
 
   const courseHref = course ? courseDetailPath(course) : "/courses";
   const courseTitle = course ? courseDisplayTitle(course) : "Course";
@@ -311,6 +317,14 @@ export function LessonView({ courseSlug, lessonId }: LessonViewProps) {
       return;
     }
     router.push(hubHref);
+  }
+
+  if (!canAccessLessons) {
+    return (
+      <div className="mx-auto max-w-lg px-4 py-10">
+        <FeatureUnauthorized message="You do not have access to lessons." />
+      </div>
+    );
   }
 
   if (loading) {

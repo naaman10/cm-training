@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 
+import { can as canFeature } from "@/lib/features/can";
 import {
   type PortalMeClientResponse,
   type PortalMeCode,
@@ -18,6 +19,9 @@ import type { PortalUser } from "@/types/portal-user";
 
 export interface UsePortalSessionResult {
   user: PortalUser | null;
+  permissions: string[];
+  isAdmin: boolean;
+  can: (featureName: string) => boolean;
   loading: boolean;
   error: string | null;
   detail: string | null;
@@ -126,6 +130,8 @@ export function usePortalSession(): UsePortalSessionResult {
 
 function usePortalSessionInner(): UsePortalSessionResult {
   const [user, setUser] = useState<PortalUser | null>(null);
+  const [permissions, setPermissions] = useState<string[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [detail, setDetail] = useState<string | null>(null);
@@ -160,6 +166,8 @@ function usePortalSessionInner(): UsePortalSessionResult {
       latestUserRef.current = data.user;
       lastOkAtRef.current = Date.now();
       setUser(data.user);
+      setPermissions(data.permissions);
+      setIsAdmin(data.isAdmin);
       setCode("ok");
       setError(null);
       setDetail(null);
@@ -187,6 +195,8 @@ function usePortalSessionInner(): UsePortalSessionResult {
     if (needsLogout) {
       latestUserRef.current = null;
       setUser(null);
+      setPermissions([]);
+      setIsAdmin(false);
       window.location.assign(
         `/auth/logout?returnTo=${encodeURIComponent("/login")}`,
       );
@@ -196,12 +206,16 @@ function usePortalSessionInner(): UsePortalSessionResult {
     if (needsApproval) {
       latestUserRef.current = null;
       setUser(null);
+      setPermissions([]);
+      setIsAdmin(false);
       window.location.assign("/pending-approval");
       return;
     }
 
     latestUserRef.current = null;
     setUser(null);
+    setPermissions([]);
+    setIsAdmin(false);
 
     inFlightRef.current = false;
     setLoading(false);
@@ -241,5 +255,21 @@ function usePortalSessionInner(): UsePortalSessionResult {
     [load],
   );
 
-  return { user, loading, error, detail, httpStatus, code, refetch };
+  const can = useCallback(
+    (featureName: string) => canFeature(featureName, { isAdmin, permissions }),
+    [isAdmin, permissions],
+  );
+
+  return {
+    user,
+    permissions,
+    isAdmin,
+    can,
+    loading,
+    error,
+    detail,
+    httpStatus,
+    code,
+    refetch,
+  };
 }

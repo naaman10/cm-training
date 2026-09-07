@@ -1,4 +1,5 @@
 import { fetchCmTrainingApiWithBearer } from "@/lib/api/client";
+import { roleIncludesAdmin } from "@/lib/features/can";
 import type { PortalMeClientResponse } from "@/types/portal-me";
 import type { PortalUser } from "@/types/portal-user";
 
@@ -57,6 +58,22 @@ function extractUpstreamDetail(json: unknown): string | undefined {
   return undefined;
 }
 
+function parsePermissions(json: Record<string, unknown>): string[] {
+  const raw = json.permissions;
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (item): item is string => typeof item === "string" && item.trim().length > 0,
+  );
+}
+
+function parseIsAdmin(
+  json: Record<string, unknown>,
+  user: PortalUser,
+): boolean {
+  if (typeof json.isAdmin === "boolean") return json.isAdmin;
+  return roleIncludesAdmin(user.role);
+}
+
 export async function buildPortalMePayload(
   accessToken: string,
 ): Promise<{ response: PortalMeClientResponse; httpStatus: number }> {
@@ -87,15 +104,19 @@ export async function buildPortalMePayload(
   }
 
   if (status === 200 && json && typeof json === "object" && "user" in json) {
-    const user = (json as { user: unknown }).user;
+    const record = json as Record<string, unknown>;
+    const user = record.user;
     if (user && typeof user === "object") {
+      const portalUser = user as PortalUser;
       return {
         httpStatus: 200,
         response: {
           ok: true,
           httpStatus: 200,
           code: "ok",
-          user: user as PortalUser,
+          user: portalUser,
+          permissions: parsePermissions(record),
+          isAdmin: parseIsAdmin(record, portalUser),
         },
       };
     }

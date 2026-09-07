@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import { FeatureUnauthorized } from "@/components/feature-unauthorized";
 import { usePortalSession } from "@/context/portal-session";
+import { FEATURE_NAMES } from "@/lib/features/names";
 import type { AdminUsersClientResponse } from "@/types/admin-users";
 import { isAdminUsersSuccess } from "@/types/admin-users";
 import type { SafeAdminUser } from "@/types/admin-user";
@@ -18,12 +20,6 @@ import { EditUserDialog } from "./edit-user-dialog";
 import { ResetPasswordDialog } from "./reset-password-dialog";
 import { UserRowActions } from "./user-row-actions";
 
-function isAdminRole(role: string | null | undefined): boolean {
-  if (!role) return false;
-  const normalized = role.trim().toLowerCase();
-  return normalized === "admin" || normalized.includes("admin");
-}
-
 function formatDate(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
@@ -35,7 +31,8 @@ function formatDate(value: string): string {
 }
 
 export function AdminUsersView() {
-  const { user: portalUser, loading: portalLoading } = usePortalSession();
+  const { user: portalUser, loading: portalLoading, can } = usePortalSession();
+  const canManageUsers = can(FEATURE_NAMES.userManagement);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,8 +54,6 @@ export function AdminUsersView() {
   );
   const [resetPasswordUser, setResetPasswordUser] =
     useState<SafeAdminUser | null>(null);
-
-  const isAdmin = isAdminRole(portalUser?.role);
 
   async function loadUsers() {
     setLoading(true);
@@ -102,11 +97,11 @@ export function AdminUsersView() {
 
   useEffect(() => {
     if (portalLoading) return;
-    if (!isAdmin) return;
+    if (!canManageUsers) return;
     queueMicrotask(() => {
       void loadUsers();
     });
-  }, [portalLoading, isAdmin]);
+  }, [portalLoading, canManageUsers]);
 
   const statusOptions = useMemo(
     () => ["all", ...new Set(users.map((u) => u.status).filter(Boolean))],
@@ -137,14 +132,9 @@ export function AdminUsersView() {
     );
   }
 
-  if (!isAdmin) {
+  if (!canManageUsers) {
     return (
-      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
-        <h2 className="text-lg font-semibold">Not authorized</h2>
-        <p className="mt-2 text-sm">
-          You must be an admin user to access user management.
-        </p>
-      </div>
+      <FeatureUnauthorized message="You do not have access to user management." />
     );
   }
 

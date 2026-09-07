@@ -4,6 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { FeatureUnauthorized } from "@/components/feature-unauthorized";
+import { usePortalSession } from "@/context/portal-session";
+import { FEATURE_NAMES } from "@/lib/features/names";
 import type {
   CreateAdminUserClientResponse,
   CreateAdminUserInput,
@@ -19,6 +22,7 @@ function isValidEmail(email: string): boolean {
 
 export function CreateUserForm() {
   const router = useRouter();
+  const { can } = usePortalSession();
 
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -88,6 +92,12 @@ export function CreateUserForm() {
     setHttpStatus(status);
     setError(payload.message ?? "Could not create user.");
     setDetail(typeof payload.detail === "string" ? payload.detail : null);
+  }
+
+  if (!can(FEATURE_NAMES.userManagement)) {
+    return (
+      <FeatureUnauthorized message="You do not have access to user management." />
+    );
   }
 
   return (

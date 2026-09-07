@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { FeatureUnauthorized } from "@/components/feature-unauthorized";
+import { usePortalSession } from "@/context/portal-session";
 import {
   courseDetailPath,
   courseSlugMatches,
@@ -16,6 +18,7 @@ import {
 } from "@/lib/courses/lesson-utils";
 import { emptyLessonProgressFields } from "@/lib/courses/lesson-progress";
 import { lessonDetailPath } from "@/lib/courses/lesson-path";
+import { FEATURE_NAMES } from "@/lib/features/names";
 import { richTextToPlainText } from "@/lib/courses/rich-text";
 import type { SafeCourseDetail, SafeCourseLesson } from "@/types/course";
 import type {
@@ -97,6 +100,10 @@ function EnrollmentBanners({ course }: { course: SafeCourseDetail }) {
 
 export function CourseDetailView({ courseRef }: CourseDetailViewProps) {
   const router = useRouter();
+  const { can } = usePortalSession();
+  const canViewCourses = can(FEATURE_NAMES.courses);
+  const canEnroll = can(FEATURE_NAMES.enrollments);
+  const canAccessLessons = can(FEATURE_NAMES.lessons);
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState(false);
   const [completing, setCompleting] = useState(false);
@@ -190,7 +197,7 @@ export function CourseDetailView({ courseRef }: CourseDetailViewProps) {
   }
 
   async function enrollInCourse() {
-    if (!course || course.enrollmentStatus !== "available") return;
+    if (!course || course.enrollmentStatus !== "available" || !canEnroll) return;
 
     setEnrolling(true);
     setActionError(null);
@@ -265,10 +272,19 @@ export function CourseDetailView({ courseRef }: CourseDetailViewProps) {
   }
 
   useEffect(() => {
+    if (!canViewCourses) return;
     queueMicrotask(() => {
       void loadCourse();
     });
-  }, [courseRef]);
+  }, [courseRef, canViewCourses]);
+
+  if (!canViewCourses) {
+    return (
+      <div className="mx-auto max-w-lg px-4 py-10">
+        <FeatureUnauthorized message="You do not have access to courses." />
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -322,10 +338,15 @@ export function CourseDetailView({ courseRef }: CourseDetailViewProps) {
     enrolling,
     completing,
     actionError,
-    continueHref: continueLearningHref(course),
+    continueHref: canAccessLessons ? continueLearningHref(course) : null,
+    canEnroll,
+    canAccessLessons,
     onEnroll: () => void enrollInCourse(),
     onComplete: () => void markComplete(),
   };
+
+  const lessonsUnlocked =
+    canAccessLessons && isLessonAccessible(course.enrollmentStatus);
 
   const lessonList =
     lessons.length === 0 ? (
@@ -338,11 +359,9 @@ export function CourseDetailView({ courseRef }: CourseDetailViewProps) {
           <CourseLessonRow
             key={lesson.id}
             lesson={lesson}
-            locked={!isLessonAccessible(course.enrollmentStatus)}
+            locked={!lessonsUnlocked}
             href={
-              isLessonAccessible(course.enrollmentStatus)
-                ? lessonDetailPath(course, lesson.id)
-                : null
+              lessonsUnlocked ? lessonDetailPath(course, lesson.id) : null
             }
             previewImageUrl={previewImageUrl}
           />

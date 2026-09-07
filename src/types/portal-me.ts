@@ -21,6 +21,8 @@ export type PortalMeClientResponse =
       httpStatus: 200;
       code: "ok";
       user: PortalUser;
+      permissions: string[];
+      isAdmin: boolean;
     }
   | {
       ok: false;

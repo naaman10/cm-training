@@ -2,7 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { FeatureUnauthorized } from "@/components/feature-unauthorized";
+import { usePortalSession } from "@/context/portal-session";
 import { splitCoursesByEnrollment } from "@/lib/courses/course-utils";
+import { FEATURE_NAMES } from "@/lib/features/names";
 import type { SafeCourseSummary } from "@/types/course";
 import type { CoursesListClientResponse } from "@/types/courses";
 import { isCoursesListSuccess } from "@/types/courses";
@@ -10,6 +13,8 @@ import { isCoursesListSuccess } from "@/types/courses";
 import { CoursesSection } from "./courses-section";
 
 export function CoursesView() {
+  const { can } = usePortalSession();
+  const canViewCourses = can(FEATURE_NAMES.courses);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [detail, setDetail] = useState<string | null>(null);
@@ -54,15 +59,22 @@ export function CoursesView() {
   }
 
   useEffect(() => {
+    if (!canViewCourses) return;
     queueMicrotask(() => {
       void loadCourses();
     });
-  }, []);
+  }, [canViewCourses]);
 
   const { yourCourses, availableCourses } = useMemo(
     () => splitCoursesByEnrollment(courses),
     [courses],
   );
+
+  if (!canViewCourses) {
+    return (
+      <FeatureUnauthorized message="You do not have access to courses." />
+    );
+  }
 
   if (loading) {
     return (
