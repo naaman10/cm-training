@@ -12,6 +12,7 @@ type MainNavProps = {
 export function MainNav({ actionHref, actionLabel }: MainNavProps) {
   const { can } = usePortalSession();
   const showCourses = can(FEATURE_NAMES.courses);
+  const showSocials = can(FEATURE_NAMES.socialCreate);
   const showUserManagement = can(FEATURE_NAMES.userManagement);
 
   return (
@@ -37,6 +38,14 @@ export function MainNav({ actionHref, actionLabel }: MainNavProps) {
                 href="/courses"
               >
                 Courses
+              </Link>
+            ) : null}
+            {showSocials ? (
+              <Link
+                className="transition hover:text-zinc-900 dark:hover:text-zinc-100"
+                href="/socials"
+              >
+                Socials
               </Link>
             ) : null}
             {showUserManagement ? (
